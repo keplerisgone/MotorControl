@@ -10,6 +10,7 @@
 // --- 핀 정의 ---
 const int PIN_JOY_X = A0;   // 조이스틱 X축
 const int PIN_JOY_Y = A1;   // 조이스틱 X축
+const int PIN_JOY_SW = 2;   // 조이스틱 버튼 (선택적)
 const int PIN_IN1   = 4;    // 모터 방향 A1
 const int PIN_IN2   = 7;    // 모터 방향 A2
 const int PIN_PWM   = 9;    // 모터 속도 (PWM)
@@ -18,6 +19,12 @@ const int PIN_PWM   = 9;    // 모터 속도 (PWM)
 const int PIN_IN1_M2 = 5;
 const int PIN_IN2_M2 = 6;
 const int PIN_PWM_M2 = 10;
+
+// motor 3
+const int PIN_IN1_M3 = 8;
+const int PIN_IN2_M3 = 12;
+const int PIN_PWM_M3 = 11;
+int M3_direction = 1; // 1=정방향, -1=역방향
 
 // --- 파라미터 ---
 const int   JOY_CENTER    = 512;   // 조이스틱 중립값 (캘리브레이션으로 보정 가능)
@@ -31,6 +38,7 @@ const int   PWM_ABS_MIN   = 10;    // 절대 하한 (이 이하는 못 내림)
 // --- 모터별 PWM 최대치 (런타임 조절 가능) ---
 int pwmMax_M1 = 150;
 int pwmMax_M2 = 150;
+int pwmMax_M3 = 100;
 
 float sCurveTransform(float t);
 void  motorDrive(int pinIN1, int pinIN2, int pinPWM, int dir, int pwm);
@@ -42,28 +50,47 @@ void  printPWMMax();
 // --- 상태 변수 ---
 float currentPWM = 0.0;   // 현재 출력 PWM (float으로 부드러운 ramping)
 float currentPWM_M2 = 0.0; 
+float currentPWM_M3 = 0.0;
 
 void setup() {
+  pinMode(PIN_JOY_SW, INPUT_PULLUP);  // 조이스틱 버튼 (선택적)
   pinMode(PIN_IN1, OUTPUT);
   pinMode(PIN_IN2, OUTPUT);
   pinMode(PIN_PWM, OUTPUT);
   pinMode(PIN_IN1_M2, OUTPUT);
   pinMode(PIN_IN2_M2, OUTPUT);
   pinMode(PIN_PWM_M2, OUTPUT);
+  pinMode(PIN_IN1_M3, OUTPUT);
+  pinMode(PIN_IN2_M3, OUTPUT);
+  pinMode(PIN_PWM_M3, OUTPUT);
 
   // 초기 안전 상태: 모터 정지
   motorStop(PIN_IN1, PIN_IN2, PIN_PWM);
   motorStop(PIN_IN1_M2, PIN_IN2_M2, PIN_PWM_M2);
+  motorStop(PIN_IN1_M3, PIN_IN2_M3, PIN_PWM_M3);
 
   Serial.begin(9600);
   Serial.println("System Ready. Move joystick to control motor.");
-  Serial.println("q/a: M1 PWM +/-10  |  w/s: M2 PWM +/-10  |  p: 현재값 출력");
+  Serial.println("q/a: M1 PWM +/-10  |  w/s: M2 PWM +/-10  |  p: 현재값 출력 | v: change M3 direction");
   printPWMMax();
   delay(500);  // 시스템 안정화 대기
 }
 
 void loop() {
   handleSerial();
+
+  // Third motor
+  bool joyButtonState = digitalRead(PIN_JOY_SW) == LOW;
+
+  if (joyButtonState) {
+    // 버튼이 눌렸을 때 M3 작동 (예시로 간단히 구현)
+    currentPWM_M3 = pwmMax_M3; // 최대 PWM으로 작동
+    motorDrive(PIN_IN1_M3, PIN_IN2_M3, PIN_PWM_M3, M3_direction, (int)currentPWM_M3);
+  } else {
+    // 버튼이 안 눌렸을 때 M3 정지
+    motorStop(PIN_IN1_M3, PIN_IN2_M3, PIN_PWM_M3);
+    currentPWM_M3 = 0.0;
+  }
 
   // 1. 조이스틱 읽기
   int rawX = analogRead(PIN_JOY_X);
@@ -73,10 +100,10 @@ void loop() {
   updateMotor(rawY, currentPWM_M2, PIN_IN1_M2, PIN_IN2_M2, PIN_PWM_M2, pwmMax_M2);
 
   // 디버그 출력 (시리얼 모니터)
-  Serial.print("RawX: "); Serial.print(rawX);
-  Serial.print(" | M1_PWM: "); Serial.print((int)currentPWM);
-  Serial.print(" | RawY: "); Serial.print(rawY);
-  Serial.print(" | M2_PWM: "); Serial.println((int)currentPWM_M2);
+  // Serial.print("RawX: "); Serial.println(rawX);
+  // Serial.print(" | M1_PWM: "); Serial.print((int)currentPWM);
+  // Serial.print(" | RawY: "); Serial.println(rawY);
+  // Serial.print(" | M2_PWM: "); Serial.println((int)currentPWM_M2);
 
   delay(20);  // 50Hz 제어 루프
 }
@@ -99,12 +126,17 @@ void handleSerial() {
       pwmMax_M2 = constrain(pwmMax_M2 + 10, PWM_ABS_MIN, PWM_ABS_MAX);
       Serial.print("[M2] PWM_MAX +10 → "); Serial.println(pwmMax_M2);
       break;
-    case 's':
+    case 'r':
       pwmMax_M2 = constrain(pwmMax_M2 - 10, PWM_ABS_MIN, PWM_ABS_MAX);
       Serial.print("[M2] PWM_MAX -10 → "); Serial.println(pwmMax_M2);
       break;
     case 'p':
       printPWMMax();
+      break;
+    case 'v':
+      // M3 방향 토글 (예시로 간단히 구현)
+      M3_direction = -M3_direction; // 방향 토글
+      Serial.print("[M3] Direction toggled → "); Serial.println(M3_direction == 1 ? "Forward" : "Reverse");
       break;
     default:
       break;  // 그 외 입력은 무시
@@ -154,6 +186,7 @@ void updateMotor(int rawVal, float &currentPWM, int pinIN1, int pinIN2, int pinP
   int pwmOut = (int)constrain(currentPWM, PWM_MIN, pwmMax);
   motorDrive(pinIN1, pinIN2, pinPWM, direction, pwmOut);
 }
+
 
 // ============================================================
 // S-curve 변환 함수
