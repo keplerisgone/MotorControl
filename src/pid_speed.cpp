@@ -5,8 +5,8 @@
 #define PIN_JOY_X  A0
 #define PIN_ENC_A  2       // 인터럽트 핀 (INT0)
 #define PIN_ENC_B  3
-#define PIN_IN1    7
-#define PIN_IN2    8
+#define PIN_IN1    4
+#define PIN_IN2    7
 #define PIN_PWM    9
 
 // ================= 시스템 상수 =================
@@ -215,18 +215,3 @@ void handleEncoder() {
   if (digitalRead(PIN_ENC_B) == LOW) pulseCount++;
   else                               pulseCount--;
 }
-```
-
----
-
-### 구조 흐름
-```
-조이스틱 X축
-    ↓ joystickToRPM() [S-curve 적용]
-Setpoint (목표 RPM)
-    ↓
-   PID  ←── Input (현재 RPM, 엔코더로 측정)
-    ↓
-Output (PWM, -255 ~ 255)
-    ↓ driveMotor()
-모터
