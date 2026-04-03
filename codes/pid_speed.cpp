@@ -17,8 +17,8 @@ const float MAX_RPM       = 60.0;   // 조이스틱 최대일 때 목표 RPM
 
 // ================= 조이스틱 파라미터 =================
 const int JOY_CENTER    = 512;
-const int JOY_DEADZONE  = 40;
-const int JOY_MAX_RANGE = 470;
+const int JOY_DEADZONE  = 0;
+const int JOY_MAX_RANGE = 511;
 
 // ================= PID 설정 =================
 double Setpoint = 0;  // 목표 RPM  (-MAX_RPM ~ +MAX_RPM)
@@ -125,7 +125,7 @@ float measureRPM(unsigned long dt_ms) {
 float joystickToRPM(int rawX) {
   int offset = rawX - JOY_CENTER;
 
-  if (abs(offset) <= JOY_DEADZONE) return 0.0;
+  if (abs(offset) < JOY_DEADZONE) return 0.0;
 
   float norm;
   int   sign;
